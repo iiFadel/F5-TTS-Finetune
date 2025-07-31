@@ -13,23 +13,27 @@
 
 **E2 TTS**: Flat-UNet Transformer, closest reproduction from [paper](https://arxiv.org/abs/2406.18009).
 
-**Sway Sampling**: Inference-time flow step sampling strategy, greatly improves performance
-
-### Thanks to all the contributors !
-
-## News
 - **2025/03/12**: 🔥 F5-TTS v1 base model with better training and inference performance. [Few demo](https://swivid.github.io/F5-TTS_updates).
 - **2024/10/08**: F5-TTS & E2 TTS base models on [🤗 Hugging Face](https://huggingface.co/SWivid/F5-TTS), [🤖 Model Scope](https://www.modelscope.cn/models/SWivid/F5-TTS_Emilia-ZH-EN), [🟣 Wisemodel](https://wisemodel.cn/models/SJTU_X-LANCE/F5-TTS_Emilia-ZH-EN).
 
 ## Installation
 
-### Create a separate environment if needed
+### Create a environment - using Conda
 
 ```bash
-# Create a python 3.10 conda env (you could also use virtualenv)
+# Create a python 3.10 conda env 
 conda create -n f5-tts python=3.10
 conda activate f5-tts
 ```
+
+### Create a environment - using venv
+
+```bash
+# Create a python 3.10 venv
+python3.10 -m venv f5-tts
+source f5-tts/bin/activate
+```
+
 
 ### Install PyTorch with matched device
 
@@ -80,13 +84,7 @@ conda activate f5-tts
 
 ### Then you can choose one from below:
 
-> ### 1. As a pip package (if just for inference)
-> 
-> ```bash
-> pip install f5-tts
-> ```
-> 
-> ### 2. Local editable (if also do training, finetuning)
+> ### Local editable
 > 
 > ```bash
 > git clone https://github.com/SWivid/F5-TTS.git
@@ -95,113 +93,9 @@ conda activate f5-tts
 > pip install -e .
 > ```
 
-### Docker usage also available
-```bash
-# Build from Dockerfile
-docker build -t f5tts:v1 .
-
-# Run from GitHub Container Registry
-docker container run --rm -it --gpus=all --mount 'type=volume,source=f5-tts,target=/root/.cache/huggingface/hub/' -p 7860:7860 ghcr.io/swivid/f5-tts:main
-
-# Quickstart if you want to just run the web interface (not CLI)
-docker container run --rm -it --gpus=all --mount 'type=volume,source=f5-tts,target=/root/.cache/huggingface/hub/' -p 7860:7860 ghcr.io/swivid/f5-tts:main f5-tts_infer-gradio --host 0.0.0.0
-```
-
-### Runtime
-
-Deployment solution with Triton and TensorRT-LLM.
-
-#### Benchmark Results
-Decoding on a single L20 GPU, using 26 different prompt_audio & target_text pairs, 16 NFE.
-
-| Model               | Concurrency    | Avg Latency | RTF    | Mode            |
-|---------------------|----------------|-------------|--------|-----------------|
-| F5-TTS Base (Vocos) | 2              | 253 ms      | 0.0394 | Client-Server   |
-| F5-TTS Base (Vocos) | 1 (Batch_size) | -           | 0.0402 | Offline TRT-LLM |
-| F5-TTS Base (Vocos) | 1 (Batch_size) | -           | 0.1467 | Offline Pytorch |
-
-See [detailed instructions](src/f5_tts/runtime/triton_trtllm/README.md) for more information.
-
-
-## Inference
-
-- In order to achieve desired performance, take a moment to read [detailed guidance](src/f5_tts/infer).
-- By properly searching the keywords of problem encountered, [issues](https://github.com/SWivid/F5-TTS/issues?q=is%3Aissue) are very helpful.
-
-### 1. Gradio App
-
-Currently supported features:
-
-- Basic TTS with Chunk Inference
-- Multi-Style / Multi-Speaker Generation
-- Voice Chat powered by Qwen2.5-3B-Instruct
-- [Custom inference with more language support](src/f5_tts/infer/SHARED.md)
-
-```bash
-# Launch a Gradio app (web interface)
-f5-tts_infer-gradio
-
-# Specify the port/host
-f5-tts_infer-gradio --port 7860 --host 0.0.0.0
-
-# Launch a share link
-f5-tts_infer-gradio --share
-```
-
-<details>
-<summary>NVIDIA device docker compose file example</summary>
-
-```yaml
-services:
-  f5-tts:
-    image: ghcr.io/swivid/f5-tts:main
-    ports:
-      - "7860:7860"
-    environment:
-      GRADIO_SERVER_PORT: 7860
-    entrypoint: ["f5-tts_infer-gradio", "--port", "7860", "--host", "0.0.0.0"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-volumes:
-  f5-tts:
-    driver: local
-```
-
-</details>
-
-### 2. CLI Inference
-
-```bash
-# Run with flags
-# Leave --ref_text "" will have ASR model transcribe (extra GPU memory usage)
-f5-tts_infer-cli --model F5TTS_v1_Base \
---ref_audio "provide_prompt_wav_path_here.wav" \
---ref_text "The content, subtitle or transcription of reference audio." \
---gen_text "Some text you want TTS model generate for you."
-
-# Run with default setting. src/f5_tts/infer/examples/basic/basic.toml
-f5-tts_infer-cli
-# Or with your own .toml file
-f5-tts_infer-cli -c custom.toml
-
-# Multi voice. See src/f5_tts/infer/README.md
-f5-tts_infer-cli -c src/f5_tts/infer/examples/multi/story.toml
-```
-
-
 ## Training
 
-### 1. With Hugging Face Accelerate
-
-Refer to [training & finetuning guidance](src/f5_tts/train) for best practice.
-
-### 2. With Gradio App
+### With Gradio App
 
 ```bash
 # Quick start with Gradio web interface
@@ -210,27 +104,115 @@ f5-tts_finetune-gradio
 
 Read [training & finetuning guidance](src/f5_tts/train) for more instructions.
 
+### Data Structure Setup
 
-## [Evaluation](src/f5_tts/eval)
+#### Audio Requirements
+- **Duration**: Maximum 30 seconds per audio file
+- **Format**: 44kHz WAV files
+- **Quality**: High-quality recordings recommended
 
+#### 1. Project Setup
+![image](images/image1.png)
+1. Choose **Pinyin** as tokenizer type
+2. Enter your **Project Name**
+3. Navigate to `data -> [your_project_name]`
+4. Create `wavs` folder and add your audio files
+5. Add `metadata.csv` with proper format
 
-## Development
-
-Use pre-commit to ensure code quality (will run linters and formatters automatically):
-
-```bash
-pip install pre-commit
-pre-commit install
+#### Directory Structure
+```
+F5-TTS/
+├── data/
+│   └── [your_project_name]/
+│       ├── wavs/
+│       │   ├── audio_file_1.wav
+│       │   ├── audio_file_2.wav
+│       │   └── ...
+│       └── metadata.csv
 ```
 
-When making a pull request, before each commit, run: 
-
-```bash
-pre-commit run --all-files
+#### Metadata Format
+Create a `metadata.csv` file with the following structure:
+```csv
+audio_file|text
+SPEAKER_8_s_130|سلبية أو وسوسة الشيطان أن ما يبيك تعيش حزين 
+SPEAKER_0_s_12|شاء الله عن كيفية تعلم اللغة الإنجليزية عبر الجوال قبل
+SPEAKER_1_s_2|بما يقوله هذه قد تكون ميزة وقد تكون عيب
 ```
 
-Note: Some model components have linting exceptions for E722 to accommodate tensor notation.
+**Important**: Do NOT add ".wav" extension to the audio file names in the metadata.
 
+
+#### 2. Vocabulary Check
+![image](images/image2.png)
+1. Click **"Check vocab"** in the Gradio interface
+2. Choose model: **"F5TTS_v1_Base"** or **"F5TTS_Base"**
+3. Click **"Extend"** to update vocabulary
+
+#### 3. Data Preparation
+![image](images/image3.png)
+1. Click **"Prepare"** to process your data
+2. Verify correctness by clicking **"Random Sample"**
+3. Review generated samples for quality
+
+#### 4. Model Training
+![image](images/image4.png)
+**Training Configuration:**
+- **Model**: Choose between F5TTS_v1_Base or F5TTS_Base
+- **Batch Size Type**: Select "frame"
+- **Mixed Precision**: Use bf16 for better performance
+- **Epochs**: Set high number (extensive training required)
+
+**Important Training Notes:**
+- F5-TTS requires **extensive training** for good results
+- Monitor training progress and adjust epochs accordingly
+- Use auto settings as starting point, then fine-tune parameters
+
+#### 5. Model Testing
+- Test the model with random samples during training
+- Evaluate speech quality and naturalness
+- Adjust training parameters if needed
+
+#### 6. Checkpoint Management
+- Save the best or last checkpoint
+- Export as `.pth` or `.safetensors` format
+- Prune unnecessary checkpoints to save space
+
+## Inference
+
+### Using Custom Pipeline Script
+Use the provided `run_pipeline.py` script for automated inference:
+
+1. **Prepare Input**: Create `sentences.txt` with sentences for synthetic speech generation
+
+2. **Run Inference**: Execute the pipeline script with your trained model
+
+#### Example Command
+```bash
+python run_pipeline.py \
+  --num_samples 5 \
+  --speakers SPEAKER_0200 \
+  --model F5TTS_v1_Base \
+  --ckpt_file F5-TTS/ckpts/full-fine-tuning/model_last.safetensors \
+  --vocab_file F5-TTS/data/full-fine-tuning_pinyin/vocab.txt \
+  --wav_dir F5-TTS/data/full-fine-tuning_pinyin/wavs \
+  --metadata_csv F5-TTS/data/full-fine-tuning_pinyin/metadata.csv \
+  --gen_txt F5-TTS/sentences.txt \
+  --out_root F5-TTS/tests \
+  --output_metadata metadata.csv
+```
+
+#### Parameter Description
+- `--num_samples`: Number of audio samples to generate
+- `--speakers`: Target speaker ID from your training data
+- `--model`: Base model architecture used
+- `--ckpt_file`: Path to your fine-tuned model checkpoint
+- `--vocab_file`: Vocabulary file from data preparation
+- `--wav_dir`: Directory containing reference audio files
+- `--metadata_csv`: Training metadata file
+- `--gen_txt`: Text file containing sentences to synthesize
+- `--out_root`: Output directory for generated audio
+- `--output_metadata`: Output metadata filename
 
 ## Acknowledgements
 
